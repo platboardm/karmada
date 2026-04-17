@@ -527,3 +527,76 @@ func Test_divideReplicasByJobCompletions(t *testing.T) {
 		})
 	}
 }
+
+func TestJobCompletionsCorrectAssignment(t *testing.T) {
+	tests := []struct {
+		name           string
+		targetClusters []workv1alpha2.TargetCluster
+		workload       *unstructured.Unstructured
+		want           map[string]int32
+	}{
+		{
+			name: "non-alphabetical cluster order with asymmetric weights",
+			targetClusters: []workv1alpha2.TargetCluster{
+				{Name: "west", Replicas: 6},
+				{Name: "east", Replicas: 4},
+			},
+			workload: &unstructured.Unstructured{
+				Object: map[string]any{
+					"spec": map[string]any{
+						"completions": int64(10),
+					},
+				},
+			},
+			want: map[string]int32{
+				"west": 6,
+				"east": 4,
+			},
+		},
+		{
+			name: "alphabetical cluster order with symmetric weights",
+			targetClusters: []workv1alpha2.TargetCluster{
+				{Name: "cluster1", Replicas: 5},
+				{Name: "cluster2", Replicas: 5},
+			},
+			workload: &unstructured.Unstructured{
+				Object: map[string]any{
+					"spec": map[string]any{
+						"completions": int64(10),
+					},
+				},
+			},
+			want: map[string]int32{
+				"cluster1": 5,
+				"cluster2": 5,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jobCompletions, err := divideReplicasByJobCompletions(tt.workload, tt.targetClusters)
+			if err != nil {
+				t.Fatalf("divideReplicasByJobCompletions() error = %v", err)
+			}
+
+			jobCompletionsMap := make(map[string]int32, len(jobCompletions))
+			for _, jc := range jobCompletions {
+				jobCompletionsMap[jc.Name] = jc.Replicas
+			}
+
+			got := make(map[string]int32, len(tt.targetClusters))
+			for _, targetCluster := range tt.targetClusters {
+				completions, ok := jobCompletionsMap[targetCluster.Name]
+				if !ok {
+					t.Fatalf("no completions found for cluster %s", targetCluster.Name)
+				}
+				got[targetCluster.Name] = completions
+			}
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("TestJobCompletionsCorrectAssignment got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
