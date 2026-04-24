@@ -83,10 +83,13 @@ func ContainsAnnotations(annotations map[string]string, required map[string]stri
 
 // MergeAnnotations merges the source annotations into the destination annotations map.
 // If a key exists in both maps, the source value takes precedence.
-// Returns the merged annotations map.
+// Returns the merged annotations map. If both src and dst are nil, returns nil.
 func MergeAnnotations(dst, src map[string]string) map[string]string {
+	if dst == nil && src == nil {
+		return nil
+	}
 	if dst == nil {
-		dst = make(map[string]string)
+		dst = make(map[string]string, len(src))
 	}
 	for k, v := range src {
 		dst[k] = v
@@ -94,8 +97,8 @@ func MergeAnnotations(dst, src map[string]string) map[string]string {
 	return dst
 }
 
-// GetObjectAnnotations is a convenience wrapper that retrieves annotations
-// directly from a metav1.Object interface.
+// GetObjectAnnotations is a convenience helper that retrieves the annotations
+// map from a metav1.Object, returning nil if the object itself is nil.
 func GetObjectAnnotations(obj metav1.Object) map[string]string {
 	if obj == nil {
 		return nil
