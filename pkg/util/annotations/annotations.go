@@ -71,6 +71,7 @@ func HasAnnotation(annotations map[string]string, key string) bool {
 
 // ContainsAnnotations checks whether all the specified annotations (key-value pairs)
 // are present in the given annotations map.
+// Note: if required is nil or empty, this always returns true.
 func ContainsAnnotations(annotations map[string]string, required map[string]string) bool {
 	for k, v := range required {
 		if val, exists := annotations[k]; !exists || val != v {
@@ -93,8 +94,8 @@ func MergeAnnotations(dst, src map[string]string) map[string]string {
 	return dst
 }
 
-// GetObjectAnnotations is a convenience helper that extracts annotations from
-// any object implementing the metav1.Object interface.
+// GetObjectAnnotations is a convenience wrapper that retrieves annotations
+// directly from a metav1.Object interface.
 func GetObjectAnnotations(obj metav1.Object) map[string]string {
 	if obj == nil {
 		return nil
