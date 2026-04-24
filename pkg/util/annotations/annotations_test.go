@@ -22,147 +22,159 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestGetAnnotationValue(t *testing.T) {
+func TestContainsAnnotations(t *testing.T) {
 	tests := []struct {
 		name        string
 		object      metav1.Object
-		key         string
-		expected    string
+		annotations map[string]string
+		want        bool
 	}{
 		{
-			name: "annotation exists",
+			name: "object contains all annotations",
 			object: &metav1.ObjectMeta{
 				Annotations: map[string]string{
-					"test-key": "test-value",
+					"key1": "value1",
+					"key2": "value2",
 				},
 			},
-			key:      "test-key",
-			expected: "test-value",
-		},
-		{
-			name: "annotation does not exist",
-			object: &metav1.ObjectMeta{
-				Annotations: map[string]string{},
+			annotations: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
 			},
-			key:      "missing-key",
-			expected: "",
+			want: true,
 		},
 		{
-			name:     "nil annotations",
-			object:   &metav1.ObjectMeta{},
-			key:      "test-key",
-			expected: "",
+			name: "object contains subset of annotations",
+			object: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			annotations: map[string]string{
+				"key1": "value1",
+			},
+			want: true,
+		},
+		{
+			name: "object missing one annotation",
+			object: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"key1": "value1",
+				},
+			},
+			annotations: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+			want: false,
+		},
+		{
+			name: "object has annotation with different value",
+			object: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"key1": "wrong-value",
+				},
+			},
+			annotations: map[string]string{
+				"key1": "value1",
+			},
+			want: false,
+		},
+		{
+			name: "object has no annotations",
+			object: &metav1.ObjectMeta{
+				Annotations: nil,
+			},
+			annotations: map[string]string{
+				"key1": "value1",
+			},
+			want: false,
+		},
+		{
+			name: "empty annotations to check always returns true",
+			object: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"key1": "value1",
+				},
+			},
+			annotations: map[string]string{},
+			want:        true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GetAnnotationValue(tt.object, tt.key)
-			if got != tt.expected {
-				t.Errorf("GetAnnotationValue() = %v, want %v", got, tt.expected)
+			got := ContainsAnnotations(tt.object, tt.annotations)
+			if got != tt.want {
+				t.Errorf("ContainsAnnotations() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestSetAnnotation(t *testing.T) {
-	tests := []struct {
-		name   string
-		object metav1.Object
-		key    string
-		value  string
-	}{
-		{
-			name:   "set annotation on object with nil annotations",
-			object: &metav1.ObjectMeta{},
-			key:    "new-key",
-			value:  "new-value",
-		},
-		{
-			name: "overwrite existing annotation",
-			object: &metav1.ObjectMeta{
-				Annotations: map[string]string{
-					"existing-key": "old-value",
-				},
-			},
-			key:   "existing-key",
-			value: "new-value",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			SetAnnotation(tt.object, tt.key, tt.value)
-			got := tt.object.GetAnnotations()[tt.key]
-			if got != tt.value {
-				t.Errorf("SetAnnotation() annotation value = %v, want %v", got, tt.value)
-			}
-		})
-	}
-}
-
-func TestRemoveAnnotation(t *testing.T) {
-	tests := []struct {
-		name   string
-		object metav1.Object
-		key    string
-	}{
-		{
-			name: "remove existing annotation",
-			object: &metav1.ObjectMeta{
-				Annotations: map[string]string{
-					"test-key": "test-value",
-				},
-			},
-			key: "test-key",
-		},
-		{
-			name:   "remove annotation from nil map",
-			object: &metav1.ObjectMeta{},
-			key:    "test-key",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			RemoveAnnotation(tt.object, tt.key)
-			if _, exists := tt.object.GetAnnotations()[tt.key]; exists {
-				t.Errorf("RemoveAnnotation() annotation %v still exists after removal", tt.key)
-			}
-		})
-	}
-}
-
-func TestHasAnnotation(t *testing.T) {
+func TestMergeAnnotations(t *testing.T) {
 	tests := []struct {
 		name     string
 		object   metav1.Object
-		key      string
-		expected bool
+		toMerge  map[string]string
+		wantAnno map[string]string
 	}{
 		{
-			name: "annotation exists",
+			name: "merge into existing annotations",
 			object: &metav1.ObjectMeta{
 				Annotations: map[string]string{
-					"test-key": "test-value",
+					"existing-key": "existing-value",
 				},
 			},
-			key:      "test-key",
-			expected: true,
+			toMerge: map[string]string{
+				"new-key": "new-value",
+			},
+			wantAnno: map[string]string{
+				"existing-key": "existing-value",
+				"new-key":      "new-value",
+			},
 		},
 		{
-			name:     "annotation does not exist",
-			object:   &metav1.ObjectMeta{},
-			key:      "missing-key",
-			expected: false,
+			name: "merge overwrites existing key",
+			object: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"key": "old-value",
+				},
+			},
+			toMerge: map[string]string{
+				"key": "new-value",
+			},
+			wantAnno: map[string]string{
+				"key": "new-value",
+			},
+		},
+		{
+			name: "merge into nil annotations",
+			object: &metav1.ObjectMeta{
+				Annotations: nil,
+			},
+			toMerge: map[string]string{
+				"key": "value",
+			},
+			wantAnno: map[string]string{
+				"key": "value",
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := HasAnnotation(tt.object, tt.key)
-			if got != tt.expected {
-				t.Errorf("HasAnnotation() = %v, want %v", got, tt.expected)
+			MergeAnnotations(tt.object, tt.toMerge)
+			got := tt.object.GetAnnotations()
+			for k, v := range tt.wantAnno {
+				if got[k] != v {
+					t.Errorf("MergeAnnotations() annotation[%s] = %v, want %v", k, got[k], v)
+				}
+			}
+			if len(got) != len(tt.wantAnno) {
+				t.Errorf("MergeAnnotations() len = %d, want %d", len(got), len(tt.wantAnno))
 			}
 		})
 	}
