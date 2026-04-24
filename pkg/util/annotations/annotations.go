@@ -85,7 +85,7 @@ func ContainsAnnotations(annotations map[string]string, required map[string]stri
 // If a key exists in both maps, the source value takes precedence.
 // Returns the merged annotations map. If both src and dst are nil, returns nil.
 // Note: dst is modified in place.
-// Note: if src is nil, dst is returned as-is without any modifications.
+// Note: if only dst is nil, a new map is allocated from src to avoid mutating a nil map.
 func MergeAnnotations(dst, src map[string]string) map[string]string {
 	if src == nil {
 		return dst
@@ -99,12 +99,8 @@ func MergeAnnotations(dst, src map[string]string) map[string]string {
 	return dst
 }
 
-// GetObjectAnnotations is a convenience helper that retrieves annotations
-// directly from a metav1.Object, avoiding the need to call GetAnnotations()
-// separately before passing to other functions in this package.
-func GetObjectAnnotations(obj metav1.Object) map[string]string {
-	if obj == nil {
-		return nil
-	}
-	return obj.GetAnnotations()
+// ObjectHasAnnotation is a convenience wrapper that checks whether a metav1.Object
+// contains the specified annotation key.
+func ObjectHasAnnotation(obj metav1.Object, key string) bool {
+	return HasAnnotation(obj.GetAnnotations(), key)
 }
